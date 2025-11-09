@@ -1,0 +1,54 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// WiFi info
+const char* ssid = "WIFIEE1C3F";
+const char* password = "36RAL321RCZDV7KQ";
+
+// NTP setup
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", -8 * 3600, 60000); // UTC-8 for PST
+
+void setup() {
+  Serial.begin(115200);
+
+  // Connect WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected!");
+
+  // Initialize OLED
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("SSD1306 allocation failed");
+    for (;;);
+  }
+  display.clearDisplay();
+
+  // Start NTP
+  timeClient.begin();
+}
+
+void loop() {
+  timeClient.update();
+
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(10, 25);
+  display.print(timeClient.getFormattedTime());
+  display.display();
+
+  delay(1000);
+}
