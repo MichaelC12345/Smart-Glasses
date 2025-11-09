@@ -1,0 +1,63 @@
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Joystick pins
+const int VRx = 34;
+const int VRy = 35;
+const int SW = 32;
+
+int cursorX = SCREEN_WIDTH / 2;
+int cursorY = SCREEN_HEIGHT / 2;
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(VRx, INPUT);
+  pinMode(VRy, INPUT);
+  pinMode(SW, INPUT_PULLUP);
+
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED not found");
+    for(;;);
+  }
+
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+}
+
+void loop() {
+  int xValue = analogRead(VRx);
+  int yValue = analogRead(VRy);
+  bool buttonPressed = !digitalRead(SW);
+
+  // Map analog values (0–4095) to screen range
+  int deltaX = map(xValue, 0, 4095, -2, 2);
+  int deltaY = map(yValue, 0, 4095, -2, 2);
+
+  // Update cursor position
+  cursorX += deltaX;
+  cursorY += deltaY;
+
+  // Keep cursor inside screen boundaries
+  cursorX = constrain(cursorX, 0, SCREEN_WIDTH - 1);
+  cursorY = constrain(cursorY, 0, SCREEN_HEIGHT - 1);
+
+  // Draw screen
+  display.clearDisplay();
+  display.drawCircle(cursorX, cursorY, 2, SSD1306_WHITE); // Cursor dot
+
+  // Optional: show button press
+  if (buttonPressed) {
+    display.setCursor(0, 0);
+    display.print("Button!");
+  }
+
+  display.display();
+
+  delay(30);
+}
