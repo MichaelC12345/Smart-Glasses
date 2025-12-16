@@ -1,0 +1,116 @@
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SERVICE_UUID        "1234"
+#define CHARACTERISTIC_UUID "5678"
+
+// OLED setup
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1  // not used on ESP32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// Variables for received data
+String receivedWeather = "None";
+String receivedTime    = "Waiting...";
+
+void updateOLED() {
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+
+    display.setCursor(0, 0);
+    display.println("ESP32 BLE Display");
+
+    display.setCursor(0, 20);
+    display.print("Time: ");
+    display.println(receivedTime);
+
+    display.setCursor(0, 40);
+    display.print("Weather: ");
+    display.println(receivedWeather);
+
+    display.display();
+}
+
+class MyCallbacks : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+        String value = pCharacteristic->getValue();
+        
+        if (value.length() > 0) {
+            String msg = String(value.c_str());
+
+            Serial.print("Message received: ");
+            Serial.println(msg);
+
+            // Parse TIME
+            if (msg.startsWith("TIME:")) {
+                receivedTime = msg.substring(5);
+                Serial.print("Updated Time: ");
+                Serial.println(receivedTime);
+            }
+
+            // Parse WEATHER
+            else if (msg.startsWith("WEATHER:")) {
+                receivedWeather = msg.substring(8);
+                Serial.print("Updated Weather: ");
+                Serial.println(receivedWeather);
+            }
+
+            // Update OLED after any message
+            updateOLED();
+        }
+    }
+};
+
+void setup() {
+    Serial.begin(115200);
+    delay(500);
+
+    Serial.println("Booting ESP32 BLE + OLED...");
+
+    // Init OLED
+    if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+        Serial.println("OLED NOT FOUND!");
+        for(;;);
+    }
+
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println("Waiting for BLE...");
+    display.display();
+
+    // Create BLE device
+    BLEDevice::init("ESP32-BLE");
+
+    BLEServer *pServer = BLEDevice::createServer();
+    BLEService *pService = pServer->createService(SERVICE_UUID);
+
+    BLECharacteristic *pCharacteristic = pService->createCharacteristic(
+        CHARACTERISTIC_UUID,
+        BLECharacteristic::PROPERTY_WRITE |
+        BLECharacteristic::PROPERTY_WRITE_NR
+    );
+
+    pCharacteristic->setCallbacks(new MyCallbacks());
+
+    pService->start();
+
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(SERVICE_UUID);
+    pAdvertising->setScanResponse(true);
+    BLEDevice::startAdvertising();
+
+    Serial.println("ESP32 BLE Ready!");
+}
+
+void loop() {
+    // Everything is handled by BLE callbacks
+}
